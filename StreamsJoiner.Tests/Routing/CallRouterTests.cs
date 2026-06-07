@@ -17,7 +17,7 @@ public sealed class CallRouterTests
         _processorStarted = false;
         return new CallRouter(
             NullLogger<CallRouter>.Instance,
-            (_, _) =>
+            (_, _, _) =>
             {
                 _processorStarted = true;
                 return Task.CompletedTask;

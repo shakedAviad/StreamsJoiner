@@ -8,7 +8,7 @@ namespace StreamsJoiner.Core.Routing;
 
 public sealed class CallRouter(
     ILogger<CallRouter> logger,
-    Func<CallActor, CancellationToken, Task> processorFactory)
+    Func<string, CallActor, CancellationToken, Task> processorFactory)
 {
     private static readonly TimeSpan StaleThreshold = TimeSpan.FromHours(1);
 
@@ -54,7 +54,7 @@ public sealed class CallRouter(
             {
                 _activeCalls.TryAdd(callId, promoted);
                 await promoted.EventChannel.Writer.WriteAsync(streamEvent, ct);
-                promoted.ProcessorTask = processorFactory(promoted, ct);
+                promoted.ProcessorTask = processorFactory(callId, promoted, ct);
             }
         }
         else if (streamEvent is BusinessDataStreamEvent businessData)
@@ -80,7 +80,7 @@ public sealed class CallRouter(
             await actor.EventChannel.Writer.WriteAsync(streamEvent, ct);
             if (actor.ProcessorTask is null)
             {
-                actor.ProcessorTask = processorFactory(actor, ct);
+                actor.ProcessorTask = processorFactory(callId, actor, ct);
             }
         }
         else if (streamEvent is BusinessDataStreamEvent businessData)
