@@ -1,32 +1,37 @@
-using StreamsJoiner.Core.Models;
+using StreamsJoiner.Core.Processing;
+using StreamsJoiner.Core.Routing;
+using StreamsJoiner.Messaging.Interfaces;
 
 namespace StreamsJoiner.Services;
 
-internal sealed class CallJoinerService : BackgroundService
+internal sealed class CallJoinerService(
+    IConsumer consumer,
+    CallRouter router,
+    EventProcessor processor,
+    ProcessorFactoryHolder holder,
+    ILogger<CallJoinerService> logger) : BackgroundService
 {
-    private readonly ILogger<CallJoinerService> _logger;
-
-    public CallJoinerService(ILogger<CallJoinerService> logger)
-    {
-        _logger = logger;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("CallJoinerService started. Implement your stream-joining logic here.");
+        holder.Factory = (callId, actor, ct) =>
+            Task.Run(() => processor.ProcessAsync(callId, actor, ct), ct);
 
-        // ---------------------------------------------------------------------
-        // Your implementation goes here.
-        //
-        // Suggested starting points:
-        //   - Read from the input streams: "agent-events", "customer-events",
-        //     "business-data-events"
-        //   - Parse entries into AgentEvent / CustomerEvent / BusinessDataEvent.
-        //   - Correlate by callId and track each call's state.
-        //   - Publish CallEvent.ToMap() to the "joined-call-events" output stream.
-        // ---------------------------------------------------------------------
+        logger.LogInformation("{Service} starting", nameof(CallJoinerService));
 
-        // Keep the service alive until shutdown is requested.
-        await Task.Delay(Timeout.Infinite, stoppingToken);
+        Task agentTask = consumer.ConsumeAsync("agent-events", router.Route, stoppingToken);
+        Task customerTask = consumer.ConsumeAsync("customer-events", router.Route, stoppingToken);
+        Task businessTask = consumer.ConsumeAsync("business-data-events", router.Route, stoppingToken);
+
+        try
+        {
+            await Task.WhenAll(agentTask, customerTask, businessTask);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Unexpected error in consumer loops");
+        }
     }
 }

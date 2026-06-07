@@ -18,7 +18,20 @@ internal sealed class CustomerEventParser(
             return null;
         }
 
-        if (!Enum.TryParse<CustomerEventType>(message.Fields["eventType"], out CustomerEventType eventType))
+        if (!message.Fields.TryGetValue("customerId", out string? customerId) || string.IsNullOrEmpty(customerId))
+        {
+            logger.LogWarning("CustomerEventParser: missing customerId in message {MessageId}", message.MessageId);
+            return null;
+        }
+
+        if (!message.Fields.TryGetValue("phoneNumber", out string? phoneNumber) || string.IsNullOrEmpty(phoneNumber))
+        {
+            logger.LogWarning("CustomerEventParser: missing phoneNumber in message {MessageId}", message.MessageId);
+            return null;
+        }
+
+        if (!message.Fields.TryGetValue("eventType", out string? eventTypeStr) ||
+            !Enum.TryParse<CustomerEventType>(eventTypeStr, out CustomerEventType eventType))
         {
             logger.LogWarning("CustomerEventParser: unparseable eventType in message {MessageId}", message.MessageId);
             return null;
@@ -29,8 +42,8 @@ internal sealed class CustomerEventParser(
         return new CustomerStreamEvent
         {
             CallId = message.Fields["callId"],
-            CustomerId = message.Fields["customerId"],
-            PhoneNumber = message.Fields["phoneNumber"],
+            CustomerId = customerId,
+            PhoneNumber = phoneNumber,
             EventType = eventType,
             Timestamp = timestamp ?? string.Empty
         };
