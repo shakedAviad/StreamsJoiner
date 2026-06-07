@@ -8,12 +8,12 @@ public sealed class CallActor
     public Channel<StreamEvent> EventChannel { get; }
     public CallState State { get; }
     public Task? ProcessorTask { get; set; }
-    public DateTime CreatedAt { get; }
+    public DateTime CreatedAt { get; set; }
 
-    public CallActor()
+    public CallActor(DateTime? createdAt = null)
     {
         EventChannel = Channel.CreateUnbounded<StreamEvent>();
         State = new();
-        CreatedAt = DateTime.UtcNow;
+        CreatedAt = createdAt ?? DateTime.UtcNow;
     }
 }
